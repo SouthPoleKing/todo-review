@@ -16,8 +16,7 @@
     "productName": "时光清单",
     "directories": { "output": "dist" },
     "win": {
-      "target": "nsis",
-      "icon": "icon.ico"
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": false,
