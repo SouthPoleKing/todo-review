@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>时光清单</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ══════════ 顶部导航 ══════════ -->
+<header class="app-header">
+  <div class="logo">时光清单</div>
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="plan">
+      <span class="tab-icon">📋</span>当日计划
+    </button>
+    <button class="tab-btn" data-tab="review">
+      <span class="tab-icon">📊</span>每日复盘
+    </button>
+    <button class="tab-btn" data-tab="habits">
+      <span class="tab-icon">🎯</span>目标与习惯
+    </button>
+  </nav>
+  <div class="header-date" id="headerDate"></div>
+</header>
+
+<!-- ══════════ 界面一：当日计划 ══════════ -->
+<section class="page active" id="page-plan">
+  <div class="page-inner">
+
+    <!-- 添加任务卡片 -->
+    <div class="card add-card">
+      <h3 class="card-title">添加新任务</h3>
+      <div class="form-row">
+        <input id="taskName" type="text" class="input" placeholder="任务名称" />
+        <input id="taskDate" type="date" class="input" style="max-width:160px" />
+      </div>
+      <div class="form-row">
+        <select id="taskCategory" class="input cat-select" style="max-width:180px">
+          <option value="">选择任务类别</option>
+          <option value="紧急">🔴 紧急</option>
+          <option value="难">🔵 难</option>
+          <option value="重要">🟠 重要</option>
+          <option value="日常">🟢 日常</option>
+        </select>
+        <button class="btn btn-primary" id="addTaskBtn">＋ 添加任务</button>
+      </div>
+    </div>
+
+    <!-- 任务列表 -->
+    <div class="card">
+      <h3 class="card-title">今日任务 <span id="taskCountBadge" class="badge">0</span></h3>
+      <ul id="taskList" class="task-list"></ul>
+      <div class="empty-hint" id="taskEmpty">暂无任务，添加一个开始吧 ✨</div>
+    </div>
+
+    <!-- 后续任务列表 -->
+    <div class="card" id="futureCard">
+      <h3 class="card-title">📅 后续任务 <span id="futureBadge" class="badge" style="background:var(--yellow);color:#333">0</span></h3>
+      <ul id="futureTaskList" class="task-list"></ul>
+      <div class="empty-hint" id="futureEmpty">暂无后续任务</div>
+    </div>
+
+  </div>
+
+  <!-- 完成弹窗 -->
+  <div class="modal-overlay" id="completeModal">
+    <div class="modal">
+      <h3 id="completeModalTitle">任务完成情况</h3>
+      <div class="modal-options">
+        <button class="modal-opt-btn" id="btnAllDone">✅ 全部完成</button>
+        <button class="modal-opt-btn" id="btnPartDone">⏳ 部分完成</button>
+      </div>
+      <!-- 完成评分 -->
+      <div id="ratingWrap" style="display:none;margin-top:.75rem">
+        <p class="modal-sub">完成质量评分</p>
+        <div class="modal-options" style="margin:0">
+          <button class="modal-opt-btn rating-btn" data-score="1">😞 差</button>
+          <button class="modal-opt-btn rating-btn" data-score="2">😐 一般</button>
+          <button class="modal-opt-btn rating-btn" data-score="3">😊 满意</button>
+        </div>
+      </div>
+      <button class="modal-close" id="completeModalClose">取消</button>
+    </div>
+  </div>
+
+  <!-- 步骤梳理弹窗 -->
+  <div class="modal-overlay" id="reviewPromptModal">
+    <div class="modal">
+      <h3>是否进行步骤梳理？</h3>
+      <p class="modal-sub">将操作步骤保存到"每日复盘"中</p>
+      <div class="modal-options">
+        <button class="modal-opt-btn" id="btnDoReview">📝 立即梳理</button>
+        <button class="modal-opt-btn secondary" id="btnLaterReview">⏰ 稍后梳理</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 文本编辑器弹窗 -->
+  <div class="modal-overlay" id="editorModal">
+    <div class="modal modal-lg">
+      <h3>步骤梳理 — <span id="editorTaskName"></span></h3>
+      <textarea id="reviewEditor" class="editor-area" placeholder="记录操作步骤、心得…"></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="saveReviewBtn">保存到复盘</button>
+        <button class="btn" id="cancelEditorBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 部分完成弹窗 -->
+  <div class="modal-overlay" id="partModal">
+    <div class="modal modal-lg">
+      <h3>任务进度</h3>
+      <div class="progress-wrap">
+        <input type="range" id="progressSlider" min="0" max="100" value="50" class="slider" />
+        <span id="progressLabel">50%</span>
+      </div>
+
+      <p class="modal-sub" style="margin-top:1.1rem;margin-bottom:.5rem">还有哪些未完成？填写后回车添加</p>
+
+      <!-- 子任务输入区：名称 + 类别 + 日期 -->
+      <div class="subtask-form">
+        <input type="text" id="subtaskInput" class="input" placeholder="子任务名称" style="flex:1" />
+        <select id="subtaskCategory" class="input cat-select" style="max-width:150px">
+          <option value="">类别</option>
+          <option value="紧急">🔴 紧急</option>
+          <option value="难">🔵 难</option>
+          <option value="重要">🟠 重要</option>
+          <option value="日常">🟢 日常</option>
+        </select>
+        <input type="date" id="subtaskDate" class="input" style="max-width:155px" />
+        <button class="btn btn-primary" id="addSubtaskBtn" style="white-space:nowrap">＋ 添加</button>
+      </div>
+
+      <div id="subtaskList" class="subtask-pending-list"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="confirmPartBtn">确认并关闭</button>
+        <button class="btn" id="cancelPartBtn">取消</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 界面二：每日复盘 ══════════ -->
+<section class="page" id="page-review">
+  <div class="page-inner review-layout">
+
+    <!-- 左栏：日历 + 时间轴 -->
+    <div class="review-left">
+      <div class="card">
+        <h3 class="card-title">📅 日历</h3>
+        <div id="reviewCalendar" class="mini-calendar"></div>
+      </div>
+      <div class="card timeline-card">
+        <h3 class="card-title">🕐 时间轴 <button class="btn-sm" id="addTimelineBtn">＋</button></h3>
+        <div id="timelineWrap" class="timeline-wrap"></div>
+      </div>
+    </div>
+
+    <!-- 右栏：对比 + 复盘 -->
+    <div class="review-right">
+      <div class="card">
+        <h3 class="card-title">📋 计划 vs 实际</h3>
+        <div class="compare-header">
+          <span>计划任务</span><span>复盘情况</span>
+        </div>
+        <div id="compareList" class="compare-list"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">💡 习惯记录</h3>
+        <div id="habitCheckinArea" class="checkin-area"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 时间轴编辑弹窗 -->
+  <div class="modal-overlay" id="timelineModal">
+    <div class="modal">
+      <h3 id="timelineModalTitle">添加时间块</h3>
+      <div class="form-row">
+        <input id="tlTitle" type="text" class="input" placeholder="标题（可留空，选色块后自动填入）" />
+      </div>
+      <div class="form-row">
+        <label>开始</label>
+        <input id="tlStart" type="time" class="input" />
+        <label>结束</label>
+        <input id="tlEnd" type="time" class="input" />
+      </div>
+      <!-- 7色块 -->
+      <p class="modal-sub" style="margin:.5rem 0 .4rem">时间类型</p>
+      <div class="tl-color-presets">
+        <div class="tl-preset" data-color="#ffc045" data-label="主动社交时间" style="background:#ffc045">
+          <span>黄</span><small>主动社交</small>
+        </div>
+        <div class="tl-preset" data-color="#43d18a" data-label="滋养和健康的娱乐" style="background:#43d18a">
+          <span>绿</span><small>健康娱乐</small>
+        </div>
+        <div class="tl-preset" data-color="#ff5f5f" data-label="无脑多巴胺" style="background:#ff5f5f">
+          <span>红</span><small>无脑多巴胺</small>
+        </div>
+        <div class="tl-preset" data-color="#9b59b6" data-label="创新业务" style="background:#9b59b6">
+          <span>紫</span><small>创新业务</small>
+        </div>
+        <div class="tl-preset" data-color="#3498db" data-label="基准业务" style="background:#3498db">
+          <span>蓝</span><small>基准业务</small>
+        </div>
+        <div class="tl-preset" data-color="#95a5a6" data-label="Selfcare & Commute" style="background:#95a5a6">
+          <span>灰</span><small>Selfcare</small>
+        </div>
+        <div class="tl-preset" data-color="#e67e22" data-label="知识库整理 & OS改进" style="background:#e67e22">
+          <span>橙</span><small>知识库整理</small>
+        </div>
+      </div>
+      <input type="hidden" id="tlColor" value="#6c63ff" />
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="saveTimelineBtn">保存</button>
+        <button class="btn" id="cancelTimelineBtn">取消</button>
+        <button class="btn btn-danger" id="deleteTimelineBtn" style="display:none">删除</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 界面三：目标与习惯 ══════════ -->
+<section class="page" id="page-habits">
+  <div class="page-inner habits-layout">
+
+    <!-- 左栏：日历 + 习惯 -->
+    <div class="habits-left">
+      <div class="card">
+        <h3 class="card-title">📅 日历</h3>
+        <div id="habitsCalendar" class="mini-calendar"></div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">习惯打卡 <button class="btn-sm" id="addHabitBtn">＋</button></h3>
+        <div id="habitList" class="habit-grid"></div>
+      </div>
+    </div>
+
+    <!-- 右栏：目标 + 图表 -->
+    <div class="habits-right">
+      <div class="card">
+        <h3 class="card-title">🎯 长期目标 <button class="btn-sm" id="addGoalBtn">＋</button></h3>
+        <div id="goalList" class="goal-list"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">📈 进度总览</h3>
+        <div class="chart-tabs">
+          <button class="chart-tab active" data-range="week">本周</button>
+          <button class="chart-tab" data-range="month">本月</button>
+          <button class="chart-tab" data-range="year">全年</button>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="habitChart"></canvas>
+        </div>
+        <div class="chart-wrap" style="margin-top:1.5rem">
+          <canvas id="taskProgressChart"></canvas>
+        </div>
+        <div class="chart-wrap" style="margin-top:1.5rem">
+          <canvas id="goalProgressChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 添加习惯弹窗 -->
+  <div class="modal-overlay" id="habitModal">
+    <div class="modal">
+      <h3 id="habitModalTitle">添加习惯</h3>
+      <input id="habitName" type="text" class="input" placeholder="习惯名称（如：喝水、睡觉）" style="margin-bottom:.75rem"/>
+      <div class="form-row">
+        <input id="habitIcon" type="text" class="input" placeholder="图标（emoji）" style="width:80px"/>
+        <input id="habitColor" type="color" value="#6c63ff" />
+        <select id="habitFreq" class="input">
+          <option value="daily">每日</option>
+          <option value="weekly">每周</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="saveHabitBtn">保存</button>
+        <button class="btn" id="cancelHabitBtn">取消</button>
+        <button class="btn btn-danger" id="deleteHabitBtn" style="display:none">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加目标弹窗 -->
+  <div class="modal-overlay" id="goalModal">
+    <div class="modal">
+      <h3 id="goalModalTitle">添加目标</h3>
+      <input id="goalName" type="text" class="input" placeholder="目标名称" style="margin-bottom:.75rem"/>
+      <textarea id="goalDesc" class="editor-area" placeholder="目标描述" style="height:80px;margin-bottom:.75rem"></textarea>
+      <div class="form-row">
+        <label>截止日期</label>
+        <input id="goalDeadline" type="date" class="input" />
+      </div>
+      <div class="form-row">
+        <label>当前进度</label>
+        <input type="range" id="goalProgress" min="0" max="100" value="0" class="slider" style="flex:1"/>
+        <span id="goalProgressLabel">0%</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="saveGoalBtn">保存</button>
+        <button class="btn" id="cancelGoalBtn">取消</button>
+        <button class="btn btn-danger" id="deleteGoalBtn" style="display:none">删除</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="js/storage.js"></script>
+<script src="js/plan.js"></script>
+<script src="js/review.js"></script>
+<script src="js/habits.js"></script>
+<script>
+  // ── 顶部日期 ──
+  const headerDate = document.getElementById('headerDate');
+  const now = new Date();
+  headerDate.textContent = now.toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+
+  // ── Tab 切换 ──
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('page-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'review')  Review.refresh();
+      if (btn.dataset.tab === 'habits')  Habits.refresh();
+    });
+  });
+</script>
+</body>
+</html>
